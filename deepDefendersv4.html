@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Space Defender - Enhanced with Graphics</title>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        overflow: hidden;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #gameCanvas {
+        display: block;
+        background: #000;
+    }
+
+    /* ===== HOME / MENUS ===== */
+    #homeScreen,
+    #gameOverScreen {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: radial-gradient(circle at center, #020612 0, #000000 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        color: #00ffea;
+        text-align: center;
+        z-index: 20;
+        padding-top: 50px;
+    }
+
+    #homeScreen h1 {
+        font-size: 80px;
+        margin: 0;
+        text-shadow: 0 0 30px #00ffea;
+        letter-spacing: 5px;
+        background: linear-gradient(90deg, #00ffea, #0080ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    #titleCreditDisplay {
+        font-size: 24px;
+        color: #ffff00;
+        margin-top: 5px;
+        font-weight: bold;
+        text-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+    }
+
+    /* Sound Controls */
+    #soundControls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+    }
+
+    .sound-btn {
+        background: rgba(0, 255, 234, 0.2);
+        border: 2px solid #00ffea;
+        color: #00ffea;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+    }
+
+    .sound-btn:hover {
+        background: #00ffea;
+        color: #000;
+        box-shadow: 0 0 20px #00ffea;
+    }
+
+    /* Ship Preview Canvas */
+    #shipPreviewContainer {
+        margin: 20px 0;
+        width: 150px;
+        height: 150px;
+        position: relative;
+    }
+
+    /* ===== SHIP SELECTION ===== */
+    #shipSelection {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .ship-card {
+        border: 2px solid #00ffea;
+        padding: 15px;
+        width: 180px;
+        cursor: pointer;
+        border-radius: 12px;
+        transition: 0.3s;
+        background: rgba(0, 255, 234, 0.05);
+    }
+
+    .ship-card.selected {
+        background: rgba(0, 255, 234, 0.2);
+        box-shadow: 0 0 25px #00ffea;
+        transform: translateY(-5px);
+        border-color: #fff;
+    }
+
+    .ship-card h4 { margin: 0 0 5px 0; font-size: 16px; color: #fff; }
+    .ship-card p { font-size: 12px; color: #88efeb; margin: 0; }
+
+    .menu-button {
+        padding: 15px 50px;
+        background: transparent;
+        border: 3px solid #00ffea;
+        color: #00ffea;
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s;
+        border-radius: 8px;
+        text-transform: uppercase;
+        margin-top: 10px;
+    }
+
+    .menu-button:hover {
+        background: #00ffea;
+        color: #000;
+        box-shadow: 0 0 30px #00ffea;
+    }
+
+    /* ===== UPGRADE STORE ===== */
+    #upgradeStore {
+        margin-top: 20px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        background: rgba(0,0,0,0.5);
+        padding: 15px;
+        border-radius: 15px;
+        border: 1px solid rgba(0, 255, 234, 0.2);
+    }
+
+    .store-item {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid #00ffea;
+        padding: 12px;
+        width: 160px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .store-item h3 { font-size: 14px; margin: 0 0 5px 0; color: #fff; }
+    .store-item .cost { font-size: 16px; color: #ffff00; margin-bottom: 8px; font-weight: bold; }
+
+    .buy-btn {
+        width: 100%;
+        padding: 8px;
+        background: #00ffea;
+        border: none;
+        color: #000;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: 0.2s;
+    }
+    .buy-btn:hover { background: #fff; }
+    .buy-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+
+    /* ===== HUD ===== */
+    #ui {
+        position: absolute;
+        top: 20px; left: 20px;
+        color: #fff;
+        z-index: 10;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .stat-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 18px;
+        background: rgba(0,0,0,0.4);
+        padding: 5px 15px;
+        border-radius: 5px;
+        border-left: 3px solid #00ffea;
+    }
+
+    #healthBarContainer {
+        width: 300px; height: 18px;
+        background: rgba(255,255,255,0.1);
+        border: 2px solid #fff;
+        border-radius: 9px;
+        overflow: hidden;
+    }
+
+    #healthBar {
+        width: 100%; height: 100%;
+        background: linear-gradient(to right, #ff0000, #ff8800);
+        transition: width 0.3s;
+    }
+
+    #xpContainer {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 6px;
+        background: rgba(255,255,255,0.1);
+        z-index: 100;
+    }
+    #xpBar {
+        width: 0%; height: 100%;
+        background: #00f2ff;
+        box-shadow: 0 0 10px #00f2ff;
+    }
+
+    #radarContainer {
+        position: absolute;
+        bottom: 20px; right: 20px;
+        width: 150px; height: 150px;
+        background: rgba(0, 15, 25, 0.85);
+        border: 2px solid #00f2ff;
+        border-radius: 50%;
+        overflow: hidden;
+        box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+    }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="soundControls">
+    <button class="sound-btn" id="muteBtn" title="Toggle Mute">🔊</button>
+    <button class="sound-btn" id="musicBtn" title="Toggle Music">🎵</button>
+</div>
+
+<div id="xpContainer"><div id="xpBar"></div></div>
+
+<div id="ui" style="display:none;">
+    <div id="healthBarContainer"><div id="healthBar"></div></div>
+    <div class="stat-row">Credits: <span id="creditsValue" style="color:#ffff00; font-weight:bold;">0</span></div>
+    <div class="stat-row">Wave: <span id="waveNumber">1</span></div>
+    <div class="stat-row">Wipeouts: <span id="wipeoutCount" style="color:#00ffea;">0</span> <small style="font-size:10px; margin-left:10px;">[SPACE]</small></div>
+    <div style="font-size: 14px; margin-top: 10px; color: #00ffea; font-weight: bold; text-shadow: 0 0 5px #000;">
+        [WASD] MOVE | [MOUSE] AIM & FIRE | [SPACE] WIPEOUT
+    </div>
+</div>
+
+<div id="radarContainer" style="display:none;">
+    <canvas id="radarCanvas" width="150" height="150"></canvas>
+</div>
+
+<!-- HOME SCREEN -->
+<div id="homeScreen">
+    <h1>SPACE DEFENDER</h1>
+    <div id="titleCreditDisplay">Total Credits: 0</div>
+    
+    <div id="shipPreviewContainer">
+        <canvas id="previewCanvas" width="150" height="150"></canvas>
+    </div>
+
+    <div id="shipSelection">
+        <div class="ship-card selected" onclick="selectShip('interceptor', this)">
+            <h4>INTERCEPTOR</h4>
+            <p>Balanced speed & fire rate.</p>
+        </div>
+        <div class="ship-card" onclick="selectShip('tank', this)">
+            <h4>DREADNOUGHT</h4>
+            <p>High HP, slower fire rate.</p>
+        </div>
+        <div class="ship-card" onclick="selectShip('scout', this)">
+            <h4>STINGRAY</h4>
+            <p>Glass cannon. High speed.</p>
+        </div>
+    </div>
+
+    <button class="menu-button" id="startBtn">Launch Mission</button>
+
+    <div id="upgradeStore">
+        <div class="store-item">
+            <h3>Armor Plating</h3>
+            <div class="cost" id="armorCost">50 Credits</div>
+            <button class="buy-btn" id="buyArmor" onclick="buyUpgrade('armor')">Buy Upgrade</button>
+        </div>
+        <div class="store-item">
+            <h3>Weapon Speed</h3>
+            <div class="cost" id="speedCost">75 Credits</div>
+            <button class="buy-btn" id="buyWeapon" onclick="buyUpgrade('fireSpeed')">Buy Upgrade</button>
+        </div>
+    </div>
+</div>
+
+<div id="gameOverScreen" style="display:none;">
+    <h1 style="color: #ff0000; font-size: 72px; margin: 0;">SYSTEM FAILURE</h1>
+    <p id="finalScore" style="font-size: 32px; color: #fff; margin: 20px 0;">Waves Survived: 0</p>
+    <button class="menu-button" onclick="location.reload()">Reboot System</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const rCanvas = document.getElementById('radarCanvas');
+const rctx = rCanvas.getContext('2d');
+const pCanvas = document.getElementById('previewCanvas');
+const pctx = pCanvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Audio Context and Sound System
+let audioContext;
+let masterGain;
+let musicGain;
+let sfxGain;
+let isMuted = false;
+let isMusicOn = true;
+let backgroundMusic;
+
+// Asteroid Images
+const asteroidImages = [];
+const eliteAsteroidImages = [];
+
+// Load asteroid images
+function loadAsteroidImages() {
+    // Create different asteroid images using canvas
+    for(let i = 0; i < 4; i++) {
+        const img = createAsteroidImage(false, i);
+        asteroidImages.push(img);
+    }
+    
+    for(let i = 0; i < 2; i++) {
+        const img = createEliteAsteroidImage(i);
+        eliteAsteroidImages.push(img);
+    }
+}
+
+// Create regular asteroid image
+function createAsteroidImage(isElite = false, variant = 0) {
+    const size = isElite ? 90 : 48;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = size;
+    tempCanvas.height = size;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Different colors for variants
+    const colors = ['#FF9900', '#00CCFF', '#FF3366', '#33FF33'];  // Orange, Cyan, Pink, Green
+    const glowColors = ['#FF6600', '#00FFFF', '#FF0066', '#66FF33']; 
+    
+    tempCtx.save();
+    
+    // Create asteroid shape
+    tempCtx.beginPath();
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const radius = size / 2 - 5;
+    
+    // Create rocky, irregular shape
+    for(let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+        const randomRadius = radius * (0.7 + Math.random() * 0.3);
+        const x = centerX + Math.cos(angle) * randomRadius;
+        const y = centerY + Math.sin(angle) * randomRadius;
+        
+        if(angle === 0) {
+            tempCtx.moveTo(x, y);
+        } else {
+            tempCtx.lineTo(x, y);
+        }
+    }
+    tempCtx.closePath();
+    
+    // Fill with gradient
+    const gradient = tempCtx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, radius
+    );
+    
+    if(isElite) {
+        gradient.addColorStop(0, '#FF4444');
+        gradient.addColorStop(0.5, '#990000');
+        gradient.addColorStop(1, '#660000');
+    } else {
+        gradient.addColorStop(0, colors[variant]);
+        gradient.addColorStop(0.5, darkenColor(colors[variant], 30));
+        gradient.addColorStop(1, darkenColor(colors[variant], 50));
+    }
+    
+    tempCtx.fillStyle = gradient;
+    tempCtx.fill();
+    
+    //Add texture
+    tempCtx.strokeStyle = darkenColor(colors[variant], 60);
+    tempCtx.lineWidth = 1;
+    tempCtx.stroke();
+    
+    // Add crater details
+    for(let i = 0; i < 5; i++) {
+        const craterX = centerX + (Math.random() - 0.5) * radius * 0.8;
+        const craterY = centerY + (Math.random() - 0.5) * radius * 0.8;
+        const craterSize = Math.random() * 8 + 3;
+        
+        tempCtx.beginPath();
+        tempCtx.arc(craterX, craterY, craterSize, 0, Math.PI * 2);
+        tempCtx.fillStyle = darkenColor(colors[variant], 40);
+        tempCtx.fill();
+    }
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    // Add glow for elite asteroids
+    if(isElite) {
+        tempCtx.shadowBlur = 20;
+        tempCtx.shadowColor = '#FF0000';
+        tempCtx.stroke();
+    }
+    
+    tempCtx.restore();
+    
+    return tempCanvas;
+}
+const faceImage = new Image();
+faceImage.src = 'head.png'; 
+// Create elite asteroid image
+
+function createEliteAsteroidImage(variant = 0) {
+
+     const size = 90;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = size;
+    tempCanvas.height = size;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    tempCtx.save();
+    
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const radius = size / 2 - 5;
+    
+    // Draw white circle background (dog's face)
+    tempCtx.beginPath();
+    tempCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    tempCtx.fillStyle = '#F5DEB3'; // Wheat color for dog fur
+    tempCtx.fill();
+    
+    // Draw dog face outline
+    tempCtx.strokeStyle = '#8B4513'; // Saddle brown
+    tempCtx.lineWidth = 2;
+    tempCtx.stroke();
+    
+    // Draw dog ears (floppy ears)
+    // Left ear
+    tempCtx.fillStyle = '#8B4513'; // Brown ear
+    tempCtx.beginPath();
+    tempCtx.ellipse(centerX - 25, centerY - 20, 15, 25, -0.5, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Right ear
+    tempCtx.beginPath();
+    tempCtx.ellipse(centerX + 25, centerY - 20, 15, 25, 0.5, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Inner ear color (lighter)
+    tempCtx.fillStyle = '#D2691E'; // Chocolate                                                 
+    tempCtx.beginPath();
+    tempCtx.ellipse(centerX - 25, centerY - 15, 10, 20, -0.5, 0, Math.PI * 2);
+    tempCtx.fill();                                                                              
+    
+    tempCtx.beginPath();                                                                            
+    tempCtx.ellipse(centerX + 25, centerY - 15, 10, 20, 0.5, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Draw dog eyes
+    const eyeY = centerY - 5;
+    
+    // Left eye (black)
+    tempCtx.fillStyle = '#000000';
+    tempCtx.beginPath();
+    tempCtx.arc(centerX - 15, eyeY, 8, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Left eye highlight
+    tempCtx.fillStyle = '#FFFFFF';
+    tempCtx.beginPath();
+    tempCtx.arc(centerX - 18, eyeY - 2, 3, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Right eye (black)
+    tempCtx.fillStyle = '#000000';
+    tempCtx.beginPath();
+    tempCtx.arc(centerX + 15, eyeY, 8, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Right eye highlight
+    tempCtx.fillStyle = '#FFFFFF';
+    tempCtx.beginPath();
+    tempCtx.arc(centerX + 12, eyeY - 2, 3, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Draw dog nose (black triangle)
+    tempCtx.fillStyle = '#000000';
+    tempCtx.beginPath();
+    tempCtx.moveTo(centerX, centerY + 5);
+    tempCtx.lineTo(centerX - 8, centerY + 15);
+    tempCtx.lineTo(centerX + 8, centerY + 15);
+    tempCtx.closePath();
+    tempCtx.fill();
+    
+    // Nose highlight
+    tempCtx.fillStyle = '#666666';
+    tempCtx.beginPath();
+    tempCtx.arc(centerX, centerY + 10, 2, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    // Draw dog mouth (smile)
+    tempCtx.strokeStyle = '#000000';
+    tempCtx.lineWidth = 2;
+    tempCtx.beginPath();
+    tempCtx.arc(centerX, centerY + 20, 12, 0.2, Math.PI - 0.2, false);
+    tempCtx.stroke();
+    
+    // Draw tongue (if mouth open)
+    tempCtx.fillStyle = '#FF69B4'; // Hot pink tongue
+    tempCtx.beginPath();
+    tempCtx.arc(centerX, centerY + 25, 5, 0, Math.PI, true);
+    tempCtx.fill();
+    
+    // Draw dog eyebrows (cute expression)
+    tempCtx.strokeStyle = '#8B4513';
+    tempCtx.lineWidth = 3;
+    tempCtx.lineCap = 'round';
+    
+    // Left eyebrow
+    tempCtx.beginPath();
+    tempCtx.moveTo(centerX - 20, centerY - 15);
+    tempCtx.lineTo(centerX - 10, centerY - 20);
+    tempCtx.stroke();
+    
+    // Right eyebrow
+    tempCtx.beginPath();
+    tempCtx.moveTo(centerX + 10, centerY - 20);
+    tempCtx.lineTo(centerX + 20, centerY - 15);
+    tempCtx.stroke();
+    
+    // Add "DOG" text below
+    tempCtx.fillStyle = '#8B4513';
+    tempCtx.font = 'bold 14px Arial';
+    tempCtx.textAlign = 'center';
+    tempCtx.fillText('DOG', centerX, centerY + 45);
+    
+    
+    tempCtx.restore();
+    
+    return tempCanvas;
+     /*     const size = 150;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = size;
+    tempCanvas.height = size;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    const moonImage = new Image();
+    moonImage.src = 'hodHead.png';
+    
+    // Draw a temporary background while image loads (optional)
+   
+    
+    moonImage.onload = function() {
+        // Clear the temporary background
+        tempCtx.clearRect(0, 0, size, size);
+        
+        // OPTION 1: Simple fill (if image is already cropped)
+        // tempCtx.drawImage(moonImage, 0, 0, size, size);
+        
+        // OPTION 2: Circular crop (better for asteroids)
+        tempCtx.save();
+        // Create circular clipping area
+        tempCtx.beginPath();
+        tempCtx.arc(size/2, size/2, size/2 - 2, 0, Math.PI * 2);
+        tempCtx.clip();
+        
+        // Draw image (adjust these values to zoom in/center)
+        const imgSize = size * 1.2; // 50% larger than canvas
+        const offset = (imgSize - size) / -2; // Center the larger image
+        tempCtx.drawImage(moonImage, offset, offset, imgSize, imgSize);
+        
+        tempCtx.restore();
+        
+        // Optional: Add outline
+       
+        
+        // Optional: Add glow effect
+        
+    };
+    
+    // If image fails to load
+    moonImage.onerror = function() {
+        console.error("Failed to load image: hodHead.png");
+        // Draw fallback shape
+        tempCtx.clearRect(0, 0, size, size);
+        tempCtx.fillStyle = '#FF0000';
+        tempCtx.beginPath();
+        tempCtx.arc(size/2, size/2, size/2 - 5, 0, Math.PI * 2);
+        tempCtx.fill();
+    };
+    
+    return tempCanvas;
+    */
+}
+// Helper function to darken colors
+function darkenColor(color, percent) {
+    const num = parseInt(color.replace("#", ""), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) - amt;
+    const G = (num >> 8 & 0x00FF) - amt;
+    const B = (num & 0x0000FF) - amt;
+    return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+        (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+        (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+}
+
+// Initialize Audio
+function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioContext.createGain();
+        musicGain = audioContext.createGain();
+        sfxGain = audioContext.createGain();
+        
+        // Connect nodes
+        musicGain.connect(masterGain);
+        sfxGain.connect(masterGain);
+        masterGain.connect(audioContext.destination);
+        
+        // Set initial volumes
+        masterGain.gain.value = 0.7;
+        musicGain.gain.value = 0.3;
+        sfxGain.gain.value = 0.8;
+        
+        // Create background music oscillator
+        createBackgroundMusic();
+    } catch (e) {
+        console.warn("Web Audio API not supported:", e);
+    }
+}
+
+// Create ambient background music
+function createBackgroundMusic() {
+    if (!audioContext || !isMusicOn) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 220;
+    
+    gainNode.gain.value = 0.05;
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(musicGain);
+    
+    // Create LFO for subtle pulsing
+    const lfo = audioContext.createOscillator();
+    const lfoGain = audioContext.createGain();
+    
+    lfo.frequency.value = 0.1;
+    lfoGain.gain.value = 0.01;
+    
+    lfo.connect(lfoGain);
+    lfoGain.connect(gainNode.gain);
+    
+    oscillator.start();
+    lfo.start();
+    
+    backgroundMusic = { oscillator, gainNode, lfo, lfoGain };
+}
+
+// Sound Effects Generator
+function playSound(type, options = {}) {
+    if (!audioContext || isMuted) return null;
+    
+    const now = audioContext.currentTime;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(sfxGain);
+    
+    switch(type) {
+        case 'laser':
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(800, now);
+            oscillator.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            oscillator.start(now);
+            oscillator.stop(now + 0.2);
+            break;
+            
+        case 'explosion':
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(150, now);
+            oscillator.frequency.exponentialRampToValueAtTime(40, now + 0.5);
+            gainNode.gain.setValueAtTime(0.4, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            oscillator.start(now);
+            oscillator.stop(now + 0.5);
+            break;
+            
+        case 'hit':
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(400, now);
+            oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            oscillator.start(now);
+            oscillator.stop(now + 0.1);
+            break;
+            
+        case 'wipeout':
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(300, now);
+            oscillator.frequency.linearRampToValueAtTime(600, now + 0.3);
+            oscillator.frequency.linearRampToValueAtTime(300, now + 0.6);
+            gainNode.gain.setValueAtTime(0.5, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+            oscillator.start(now);
+            oscillator.stop(now + 0.6);
+            break;
+            
+        case 'powerup':
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(300, now);
+            oscillator.frequency.linearRampToValueAtTime(800, now + 0.2);
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            oscillator.start(now);
+            oscillator.stop(now + 0.2);
+            break;
+            
+        case 'select':
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(523.25, now);
+            oscillator.frequency.linearRampToValueAtTime(659.25, now + 0.1);
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            oscillator.start(now);
+            oscillator.stop(now + 0.1);
+            break;
+            
+        case 'hover':
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, now);
+            oscillator.frequency.linearRampToValueAtTime(550, now + 0.05);
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            oscillator.start(now);
+            oscillator.stop(now + 0.05);
+            break;
+            
+        case 'engine':
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.value = 120;
+            gainNode.gain.value = 0.1;
+            oscillator.start(now);
+            return { oscillator, gainNode };
+    }
+    
+    return null;
+}
+
+// Sound Control Functions
+function toggleMute() {
+    isMuted = !isMuted;
+    masterGain.gain.value = isMuted ? 0 : 0.7;
+    document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+    playSound('select');
+}
+
+function toggleMusic() {
+    isMusicOn = !isMusicOn;
+    musicGain.gain.value = isMusicOn ? 0.3 : 0;
+    document.getElementById('musicBtn').style.color = isMusicOn ? '#00ffea' : '#ff4444';
+    playSound('select');
+}
+
+// Initialize audio on first user interaction
+function initAudioOnInteraction() {
+    if (!audioContext) {
+        initAudio();
+        document.removeEventListener('click', initAudioOnInteraction);
+        document.removeEventListener('keydown', initAudioOnInteraction);
+    }
+}
+
+// Add event listeners for audio initialization
+document.addEventListener('click', initAudioOnInteraction);
+document.addEventListener('keydown', initAudioOnInteraction);
+
+let gameActive = false;
+let credits = 0;
+let waveNumber = 1;
+let asteroids = [];
+let bullets = [];
+let particles = [];
+let stars = [];
+let wipeoutCount = 0;
+let playerXP = 0;
+let nextLevelXP = 100;
+let previewAngle = 0;
+let engineSound = null;
+
+// Load asteroid images
+loadAsteroidImages();
+
+// Controls State
+const keys = { w: false, a: false, s: false, d: false, space: false };
+const mouse = { x: 0, y: 0, down: false };
+
+// Star Initialization - more stars for better space effect
+for(let i=0; i<300; i++) {
+    stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 3 + 0.5,
+        speed: Math.random() * 0.8 + 0.2,
+        brightness: Math.random() * 0.8 + 0.2
+    });
+}
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    size: 22,
+    speed: 5,
+    angle: 0,
+    health: 100,
+    maxHealth: 100,
+    fireCooldown: 0,
+    fireRate: 18,
+    type: 'interceptor'
+};
+
+function selectShip(type, el) {
+    document.querySelectorAll('.ship-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    player.type = type;
+    if(type === 'tank') {
+        player.maxHealth = 200; player.health = 200; player.fireRate = 32; player.speed = 3.5;
+    } else if(type === 'scout') {
+        player.maxHealth = 70; player.health = 70; player.fireRate = 10; player.speed = 7.5;
+    } else {
+        player.maxHealth = 100; player.health = 100; player.fireRate = 18; player.speed = 5;
+    }
+    playSound('select');
+}
+
+function drawShip(targetCtx, x, y, angle, color) {
+    targetCtx.save();
+    targetCtx.translate(x, y);
+    targetCtx.rotate(angle);
+    targetCtx.strokeStyle = color;
+    targetCtx.lineWidth = 3;
+    targetCtx.beginPath();
+    
+    if (player.type === 'tank') {
+        targetCtx.moveTo(25, 0);
+        targetCtx.lineTo(-15, -22);
+        targetCtx.lineTo(-8, 0);
+        targetCtx.lineTo(-15, 22);
+    } else if (player.type === 'scout') {
+        targetCtx.moveTo(30, 0);
+        targetCtx.lineTo(-18, -12);
+        targetCtx.lineTo(-10, 0);
+        targetCtx.lineTo(-18, 12);
+    } else {
+        targetCtx.moveTo(25, 0); 
+        targetCtx.lineTo(-18, -18);
+        targetCtx.lineTo(-10, 0);
+        targetCtx.lineTo(-18, 18);
+    }
+    
+    targetCtx.closePath(); 
+    targetCtx.stroke();
+    targetCtx.restore();
+}
+
+function updatePreview() {
+    if(gameActive) return;
+    pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    previewAngle += 0.02;
+    
+    pctx.shadowBlur = 20;
+    pctx.shadowColor = '#00ffea';
+    drawShip(pctx, 75, 75, previewAngle, '#00ffea');
+    pctx.shadowBlur = 0;
+    
+    requestAnimationFrame(updatePreview);
+}
+
+class Bullet {
+    constructor(x, y, angle, color = '#00ffea') {
+        this.x = x; this.y = y; this.angle = angle;
+        this.speed = 14; this.life = 100; this.color = color;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = 0.1;
+    }
+    update() {
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        this.life--;
+        this.rotation += this.rotationSpeed;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.fillStyle = this.color;
+        
+        // Draw energy bullet shape
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(0, 6);
+        ctx.lineTo(-8, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add glow effect
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Asteroid {
+    constructor(x, y, elite = false) {
+        this.x = x; this.y = y;
+        this.size = elite ? 45 : 24;
+        this.elite = elite;
+        this.health = elite ? 10 : 2;
+        this.speed = Math.random() * 1.5 + (0.5 * (1 + waveNumber * 0.1));
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.03;
+        this.image = elite ? 
+            eliteAsteroidImages[Math.floor(Math.random() * eliteAsteroidImages.length)] :
+            asteroidImages[Math.floor(Math.random() * asteroidImages.length)];
+    }
+    update() {
+        let ang = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(ang) * this.speed;
+        this.y += Math.sin(ang) * this.speed;
+        this.rotation += this.rotationSpeed;
+        
+        let dist = Math.sqrt((this.x-player.x)**2 + (this.y-player.y)**2);
+        if(dist < this.size + player.size) {
+            player.health -= this.elite ? 20 : 8;
+            playSound('hit');
+            this.health = 0;
+        }
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        
+        // Draw asteroid image
+        ctx.drawImage(this.image, -this.size, -this.size, this.size * 2, this.size * 2);
+        
+        // Add elite glow effect
+        if(this.elite) {
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = '#FF0000';
+            ctx.drawImage(this.image, -this.size, -this.size, this.size * 2, this.size * 2);
+            ctx.shadowBlur = 0;
+        }
+        
+        ctx.restore();
+    }
+}
+
+function spawnExplosion(x, y, color) {
+    playSound('explosion');
+    for(let i=0; i<20; i++) {
+        particles.push({
+            x, y, 
+            vx: (Math.random()-0.5)*15, 
+            vy: (Math.random()-0.5)*15,
+            life: 1.0, 
+            color, 
+            size: Math.random()*4 + 2,
+            decay: 0.02 + Math.random() * 0.03
+        });
+    }
+}
+
+function triggerWipeout() {
+    if(wipeoutCount <= 0 || !gameActive) return;
+    wipeoutCount--;
+    playSound('wipeout');
+    
+    // Create special wipeout effect
+    for(let i = 0; i < 30; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 100;
+        const x = player.x + Math.cos(angle) * dist;
+        const y = player.y + Math.sin(angle) * dist;
+        spawnExplosion(x, y, '#00ffea');
+    }
+    
+    asteroids.forEach(a => {
+        spawnExplosion(a.x, a.y, a.elite ? '#f00' : '#0ff');
+        credits += a.elite ? 15 : 5;
+        playerXP += a.elite ? 30 : 10;
+    });
+    asteroids = [];
+    updateUI();
+}
+
+function updateUI() {
+    const credVal = Math.floor(credits);
+    document.getElementById('creditsValue').innerText = credVal;
+    document.getElementById('titleCreditDisplay').innerText = "Total Credits: " + credVal;
+    document.getElementById('waveNumber').innerText = waveNumber;
+    document.getElementById('wipeoutCount').innerText = wipeoutCount;
+    document.getElementById('healthBar').style.width = Math.max(0, (player.health / player.maxHealth * 100)) + '%';
+    document.getElementById('xpBar').style.width = (playerXP / nextLevelXP * 100) + '%';
+    
+    document.getElementById('buyArmor').disabled = (credits < 50);
+    document.getElementById('buyWeapon').disabled = (credits < 75);
+}
+
+function buyUpgrade(type) {
+    if(type === 'armor' && credits >= 50) {
+        credits -= 50; 
+        player.maxHealth += 30; 
+        player.health = player.maxHealth;
+        playSound('powerup');
+    } else if(type === 'fireSpeed' && credits >= 75) {
+        credits -= 75; 
+        player.fireRate = Math.max(4, player.fireRate - 2);
+        playSound('powerup');
+    }
+    updateUI();
+}
+
+function updateEngineSound() {
+    if (!audioContext || isMuted || !gameActive) {
+        if (engineSound) {
+            engineSound.oscillator.stop();
+            engineSound = null;
+        }
+        return;
+    }
+    
+    const isMoving = keys.w || keys.a || keys.s || keys.d;
+    
+    if (isMoving && !engineSound) {
+        engineSound = playSound('engine');
+    } else if (!isMoving && engineSound) {
+        engineSound.oscillator.stop();
+        engineSound = null;
+    } else if (engineSound && isMoving) {
+        const speedFactor = player.speed / 5;
+        engineSound.oscillator.frequency.value = 120 * speedFactor;
+        engineSound.gainNode.gain.value = 0.1 * speedFactor;
+    }
+}
+
+function gameLoop() {
+    if(!gameActive) return;
+    
+    // Clear with slight fade for motion blur effect
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (keys.w) player.y -= player.speed;
+    if (keys.s) player.y += player.speed;
+    if (keys.a) player.x -= player.speed;
+    if (keys.d) player.x += player.speed;
+
+    updateEngineSound();
+
+    player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+    player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+
+    // Draw stars with twinkling effect
+    stars.forEach(s => {
+        s.y += s.speed;
+        if(s.y > canvas.height) { 
+            s.y = 0; 
+            s.x = Math.random() * canvas.width;
+            s.brightness = Math.random() * 0.8 + 0.2;
+        }
+        
+        // Twinkling effect
+        const twinkle = Math.sin(Date.now() * 0.001 + s.x) * 0.3 + 0.7;
+        ctx.fillStyle = `rgba(255, 255, 255, ${s.brightness * twinkle})`;
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+    });
+
+    player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+
+    // Draw player with engine trail
+    if(keys.w || keys.a || keys.s || keys.d) {
+        // Engine trail particles
+        for(let i = 0; i < 2; i++) {
+            const trailAngle = player.angle + Math.PI + (Math.random() - 0.5) * 0.5;
+            const trailDist = 15 + Math.random() * 10;
+            particles.push({
+                x: player.x + Math.cos(trailAngle) * trailDist,
+                y: player.y + Math.sin(trailAngle) * trailDist,
+                vx: Math.cos(trailAngle) * -3 + (Math.random() - 0.5),
+                vy: Math.sin(trailAngle) * -3 + (Math.random() - 0.5),
+                life: 0.8,
+                color: Math.random() > 0.5 ? '#00ffea' : '#0080ff',
+                size: Math.random() * 3 + 2,
+                decay: 0.05
+            });
+        }
+    }
+
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00ffea';
+    drawShip(ctx, player.x, player.y, player.angle, '#00ffea');
+    ctx.shadowBlur = 0;
+
+    player.fireCooldown--;
+    if(mouse.down && player.fireCooldown <= 0) {
+        bullets.push(new Bullet(player.x, player.y, player.angle));
+        player.fireCooldown = player.fireRate;
+        playSound('laser');
+    }
+
+    for(let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.update();
+        b.draw();
+        if(b.life <= 0) bullets.splice(i, 1);
+    }
+
+    for(let i = asteroids.length - 1; i >= 0; i--) {
+        let a = asteroids[i];
+        a.update();
+        a.draw();
+
+        for(let j = bullets.length - 1; j >= 0; j--) {
+            let b = bullets[j];
+            let dist = Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
+            if(dist < a.size) {
+                a.health--;
+                bullets.splice(j, 1);
+                spawnExplosion(b.x, b.y, '#00ffea');
+                playSound('hit');
+            }
+        }
+
+        if(a.health <= 0) {
+            spawnExplosion(a.x, a.y, a.elite ? '#f00' : '#0ff');
+            credits += a.elite ? 12 : 3;
+            playerXP += a.elite ? 25 : 8;
+            asteroids.splice(i, 1);
+            updateUI();
+        }
+    }
+
+    for(let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx; 
+        p.y += p.vy; 
+        p.life -= p.decay || 0.025;
+        
+        if(p.life > 0) {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        if(p.life <= 0) particles.splice(i, 1);
+    }
+    ctx.globalAlpha = 1;
+
+    // Radar
+    rctx.clearRect(0, 0, 150, 150);
+    rctx.strokeStyle = 'rgba(0, 255, 234, 0.2)';
+    rctx.beginPath(); 
+    rctx.arc(75, 75, 70, 0, Math.PI*2); 
+    rctx.stroke();
+    
+    // Player on radar
+    rctx.fillStyle = '#00ffea';
+    rctx.beginPath();
+    rctx.arc(75, 75, 4, 0, Math.PI * 2);
+    rctx.fill();
+    
+    asteroids.forEach(a => {
+        let dx = (a.x - player.x) * 0.08;
+        let dy = (a.y - player.y) * 0.08;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < 70) {
+            rctx.fillStyle = a.elite ? '#f00' : '#0ff';
+            rctx.beginPath();
+            rctx.arc(75 + dx, 75 + dy, a.elite ? 4 : 2, 0, Math.PI * 2);
+            rctx.fill();
+        }
+    });
+
+    if(asteroids.length === 0) {
+        waveNumber++;
+        wipeoutCount++;
+        spawnWave();
+        playSound('powerup');
+        updateUI();
+    }
+
+    if(player.health <= 0) {
+        gameActive = false;
+        if (engineSound) {
+            engineSound.oscillator.stop();
+            engineSound = null;
+        }
+        playSound('explosion');
+        
+        // Big explosion on game over
+        for(let i = 0; i < 50; i++) {
+            spawnExplosion(player.x, player.y, '#ff0000');
+        }
+        
+        document.getElementById('finalScore').innerText = "Waves Survived: " + (waveNumber - 1);
+        document.getElementById('gameOverScreen').style.display='flex';
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function spawnWave() {
+    let count = 4 + waveNumber;
+    for(let i=0; i<count; i++) {
+        let side = Math.floor(Math.random() * 4);
+        let x, y;
+        if(side === 0) { x = Math.random()*canvas.width; y = -100; }
+        else if(side === 1) { x = canvas.width+100; y = Math.random()*canvas.height; }
+        else if(side === 2) { x = Math.random()*canvas.width; y = canvas.height+100; }
+        else { x = -100; y = Math.random()*canvas.height; }
+        
+        asteroids.push(new Asteroid(x, y, Math.random() < 0.15 + (waveNumber*0.02)));
+    }
+}
+
+// Event Listeners
+window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'w') keys.w = true;
+    if (k === 'a') keys.a = true;
+    if (k === 's') keys.s = true;
+    if (k === 'd') keys.d = true;
+    if (k === ' ') triggerWipeout();
+});
+window.addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'w') keys.w = false;
+    if (k === 'a') keys.a = false;
+    if (k === 's') keys.s = false;
+    if (k === 'd') keys.d = false;
+});
+window.addEventListener('mousemove', e => { 
+    mouse.x = e.clientX; 
+    mouse.y = e.clientY; 
+});
+window.addEventListener('mousedown', () => mouse.down = true);
+window.addEventListener('mouseup', () => mouse.down = false);
+
+// Add hover sound to buttons
+document.querySelectorAll('.menu-button, .buy-btn, .ship-card').forEach(btn => {
+    btn.addEventListener('mouseenter', () => playSound('hover'));
+});
+
+document.getElementById('startBtn').addEventListener('click', () => {
+    playSound('select');
+    document.getElementById('homeScreen').style.display = 'none';
+    document.getElementById('ui').style.display = 'flex';
+    document.getElementById('radarContainer').style.display = 'block';
+    gameActive = true;
+    updateUI();
+    spawnWave();
+    gameLoop();
+});
+
+// Sound control buttons
+document.getElementById('muteBtn').addEventListener('click', toggleMute);
+document.getElementById('musicBtn').addEventListener('click', toggleMusic);
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+// Initialize
+updateUI();
+updatePreview();
+document.getElementById('musicBtn').style.color = '#00ffea';
+</script>
+</body>
+</html>
