@@ -934,9 +934,9 @@ let nextLevelXP = 100;
 let previewAngle = 0;
 let engineSound = null;
 let lastBossSpawnTime = 0;
+const BOSS_INTERVAL_MS = 60000;
 let currentBoss = null;
 let lastWipeoutGrantTime = 0;
-const BOSS_INTERVAL_MS = 60000;
 const WIPEOUT_GRANT_INTERVAL_MS = 60000;
 const MISSILE_GRANT_INTERVAL_MS = 60000;
 const MISSILE_EXPLOSION_RADIUS = 200;
@@ -1319,7 +1319,7 @@ class Asteroid {
                 this.health = 150;
                 this.speed = Math.random() * 0.4 + 0.3;
                 this.fireCooldown = 0;
-                this.fireRate = 15;
+                this.fireRate = 35;
                 this.bulletCount = 3;
             } else {
                 this.maxHealth = 180;
@@ -1994,8 +1994,8 @@ function spawnBoss() {
     else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 120; }
     else { x = -120; y = Math.random() * canvas.height; }
     
-    // 2nd boss onwards is shooter boss
-    let bossType = waveNumber >= 2 ? 'shooter' : 'normal';
+    // First boss at wave 5, shooter boss at wave 8+
+    let bossType = waveNumber >= 8 ? 'shooter' : 'normal';
     
     const boss = new Asteroid(x, y, false, true, bossType);
     asteroids.push(boss);
