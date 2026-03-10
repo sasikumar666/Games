@@ -246,6 +246,7 @@
 <canvas id="gameCanvas"></canvas>
 
 <div id="soundControls">
+    <button class="sound-btn" id="pauseBtn" title="Pause Game">⏸</button>
     <button class="sound-btn" id="muteBtn" title="Toggle Mute">🔊</button>
     <button class="sound-btn" id="musicBtn" title="Toggle Music">🎵</button>
 </div>
@@ -912,6 +913,7 @@ document.addEventListener('click', initAudioOnInteraction);
 document.addEventListener('keydown', initAudioOnInteraction);
 
 let gameActive = false;
+let isPaused = false;
 let credits = 0;
 let waveNumber = 1;
 let asteroids = [];
@@ -1572,6 +1574,19 @@ function updateEngineSound() {
 function gameLoop() {
     if(!gameActive) return;
     
+    if (isPaused) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ffea';
+        ctx.font = 'bold 60px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+        ctx.font = '24px Arial';
+        ctx.fillText('Press ESC to Resume', canvas.width / 2, canvas.height / 2 + 50);
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    
     // Clear with slight fade for motion blur effect
     ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1903,6 +1918,10 @@ window.addEventListener('keydown', e => {
     if (k === 'a') keys.a = true;
     if (k === 's') keys.s = true;
     if (k === 'd') keys.d = true;
+    if (k === 'escape' && gameActive) {
+        e.preventDefault();
+        togglePause();
+    }
     if (k === ' ' && gameActive) {
         e.preventDefault();
         triggerWipeout();
@@ -1969,7 +1988,9 @@ document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('homeScreen').style.display = 'none';
     document.getElementById('ui').style.display = 'flex';
     document.getElementById('radarContainer').style.display = 'block';
+    document.getElementById('pauseBtn').textContent = '⏸';
     gameActive = true;
+    isPaused = false;
     lastBossSpawnTime = Date.now();
     lastWipeoutGrantTime = Date.now();
     lastMissileGrantTime = Date.now();
@@ -1981,6 +2002,15 @@ document.getElementById('startBtn').addEventListener('click', () => {
 // Sound control buttons
 document.getElementById('muteBtn').addEventListener('click', toggleMute);
 document.getElementById('musicBtn').addEventListener('click', toggleMusic);
+
+function togglePause() {
+    if (!gameActive) return;
+    isPaused = !isPaused;
+    document.getElementById('pauseBtn').textContent = isPaused ? '▶' : '⏸';
+    playSound('select');
+}
+
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
 
 window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
