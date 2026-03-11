@@ -303,6 +303,7 @@
     </div>
 
     <button class="menu-button" id="startBtn">Launch Mission</button>
+    <button class="menu-button" id="testTankBtn" style="margin-top:10px;border-color:#ff6600;color:#ff6600;">Test Tank Boss</button>
 
     <div id="upgradeStore">
         <div class="store-item">
@@ -1438,21 +1439,31 @@ class Asteroid {
             
             // Tank boss teleport
             if (this.bossType === 'tank') {
-                this.teleportCooldown--;
-                if (this.teleportCooldown <= 0) {
-                    this.teleportCooldown = this.teleportInterval + Math.random() * 60;
-                    
-                    // Teleport to a random position away from player
+                // First show warning, then teleport
+                if (!this.teleportWarning && this.teleportCooldown <= 90) {
+                    // Generate teleport location
+                    this.teleportWarning = true;
                     let teleportAngle = Math.random() * Math.PI * 2;
                     let minDist = 300;
                     let teleportDist = minDist + Math.random() * 200;
                     
-                    this.x = player.x + Math.cos(teleportAngle) * teleportDist;
-                    this.y = player.y + Math.sin(teleportAngle) * teleportDist;
+                    this.teleportX = player.x + Math.cos(teleportAngle) * teleportDist;
+                    this.teleportY = player.y + Math.sin(teleportAngle) * teleportDist;
                     
                     // Keep within canvas bounds
-                    this.x = Math.max(100, Math.min(canvas.width - 100, this.x));
-                    this.y = Math.max(100, Math.min(canvas.height - 100, this.y));
+                    this.teleportX = Math.max(100, Math.min(canvas.width - 100, this.teleportX));
+                    this.teleportY = Math.max(100, Math.min(canvas.height - 100, this.teleportY));
+                }
+                
+                this.teleportCooldown--;
+                
+                if (this.teleportCooldown <= 0) {
+                    this.teleportCooldown = 480; // 8 seconds
+                    this.teleportWarning = false;
+                    
+                    // Teleport to warning location
+                    this.x = this.teleportX;
+                    this.y = this.teleportY;
                     
                     // Teleport effect
                     for (let i = 0; i < 20; i++) {
@@ -1992,6 +2003,34 @@ function gameLoop() {
 
     for(let i = asteroids.length - 1; i >= 0; i--) {
         let a = asteroids[i];
+        
+        // Draw teleport warning for tank boss
+        if (a.bossType === 'tank' && a.teleportWarning) {
+            const warnX = a.teleportX;
+            const warnY = a.teleportY;
+            const warnRadius = 100;
+            
+            // Flashing danger circle
+            const flash = Math.sin(Date.now() * 0.02) * 0.5 + 0.5;
+            ctx.beginPath();
+            ctx.arc(warnX, warnY, warnRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 0, 0, ${flash})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(warnX, warnY, warnRadius * 0.7, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 100, 0, ${flash * 0.7})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Warning text
+            ctx.fillStyle = '#ff3300';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('!', warnX, warnY - warnRadius - 10);
+        }
+        
         a.update();
         a.draw();
 
@@ -2275,6 +2314,60 @@ document.getElementById('startBtn').addEventListener('click', () => {
     lastMissileGrantTime = Date.now();
     updateUI();
     spawnWave();
+    gameLoop();
+});
+
+document.getElementById('testTankBtn').addEventListener('click', () => {
+    if (gameActive) return;
+    
+    playSound('select');
+    
+    // Set ship stats based on selection
+    if(player.type === 'tank') {
+        player.maxHealth = 200; player.health = 200; player.fireRate = 32; player.speed = 3.5;
+    } else if(player.type === 'scout') {
+        player.maxHealth = 70; player.health = 70; player.fireRate = 10; player.speed = 7.5;
+    } else {
+        player.maxHealth = 100; player.health = 100; player.fireRate = 18; player.speed = 5;
+    }
+    player.x = canvas.width / 2;
+    player.y = canvas.height / 2;
+    player.fireCooldown = 0;
+    
+    asteroids = [];
+    bullets = [];
+    missiles = [];
+    bossBullets = [];
+    rockets = [];
+    particles = [];
+    healthDrops = [];
+    shieldDrops = [];
+    healthDropAvailable = false;
+    shieldDropAvailable = false;
+    
+    // Set wave and boss count for tank boss
+    waveNumber = 1;
+    bossCount = 2; // Next boss will be tank (2 + 1 = 3)
+    
+    document.getElementById('homeScreen').style.display = 'none';
+    document.getElementById('ui').style.display = 'flex';
+    document.getElementById('radarContainer').style.display = 'block';
+    document.getElementById('pauseBtn').textContent = '⏸';
+    gameActive = true;
+    isPaused = false;
+    lastBossSpawnTime = Date.now();
+    lastWipeoutGrantTime = Date.now();
+    lastMissileGrantTime = Date.now();
+    
+    // Give player some resources
+    missileCount = 3;
+    wipeoutCount = 3;
+    credits = 100;
+    
+    updateUI();
+    
+    // Spawn tank boss immediately
+    spawnBoss();
     gameLoop();
 });
 
