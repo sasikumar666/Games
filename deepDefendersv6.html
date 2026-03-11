@@ -936,6 +936,7 @@ let engineSound = null;
 let lastBossSpawnTime = 0;
 const BOSS_INTERVAL_MS = 60000;
 let currentBoss = null;
+let bossCount = 0;
 let lastWipeoutGrantTime = 0;
 const WIPEOUT_GRANT_INTERVAL_MS = 60000;
 const MISSILE_GRANT_INTERVAL_MS = 60000;
@@ -1004,6 +1005,7 @@ function resetGame() {
     missileCount = 0;
     healthDropAvailable = false;
     healthDrops = [];
+    bossCount = 0;
     
     player.x = canvas.width / 2;
     player.y = canvas.height / 2;
@@ -1982,7 +1984,7 @@ function spawnWave() {
         else if(side === 2) { x = Math.random()*canvas.width; y = canvas.height+100; }
         else { x = -100; y = Math.random()*canvas.height; }
         
-        asteroids.push(new Asteroid(x, y, Math.random() < 0.15 + (waveNumber*0.02)));
+        asteroids.push(new Asteroid(x, y, Math.random() < 0.10 + (waveNumber * 0.01)));
     }
 }
 
@@ -1994,8 +1996,9 @@ function spawnBoss() {
     else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 120; }
     else { x = -120; y = Math.random() * canvas.height; }
     
-    // First boss at wave 5, shooter boss at wave 8+
-    let bossType = waveNumber >= 8 ? 'shooter' : 'normal';
+    // 1st boss: normal, 2nd boss+: shooter
+    bossCount++;
+    let bossType = bossCount === 1 ? 'normal' : 'shooter';
     
     const boss = new Asteroid(x, y, false, true, bossType);
     asteroids.push(boss);
