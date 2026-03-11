@@ -1315,21 +1315,36 @@ class Asteroid {
         this.elite = elite;
         this.bossType = bossType;
         if (boss) {
-            this.size = 70;
-            if (bossType === 'shooter') {
+            if (bossType === 'tank') {
+                this.size = 90;
+                this.maxHealth = 450;
+                this.health = 450;
+                this.speed = 0.2;
+                this.fireCooldown = 0;
+                this.fireRate = 90;
+                this.bulletCount = 1;
+                this.hasShield = true;
+                this.shieldHealth = 250;
+                this.shieldMaxHealth = 250;
+                this.shieldRadius = 110;
+            } else if (bossType === 'shooter') {
+                this.size = 70;
                 this.maxHealth = 150;
                 this.health = 150;
                 this.speed = Math.random() * 0.4 + 0.3;
                 this.fireCooldown = 0;
                 this.fireRate = 35;
                 this.bulletCount = 3;
+                this.hasShield = false;
             } else {
+                this.size = 70;
                 this.maxHealth = 180;
                 this.health = 180;
                 this.speed = Math.random() * 0.5 + 0.3 * (1 + waveNumber * 0.05);
                 this.fireCooldown = 0;
                 this.fireRate = 70;
                 this.bulletCount = 1;
+                this.hasShield = false;
             }
         } else {
             this.size = elite ? 45 : 24;
@@ -1353,6 +1368,11 @@ class Asteroid {
         this.rotation += this.rotationSpeed;
         
         if (this.boss) {
+            // Tank boss shield regeneration
+            if (this.bossType === 'tank' && this.hasShield && this.shieldHealth < this.shieldMaxHealth) {
+                this.shieldHealth += 0.05; // Slowly regenerate shield
+            }
+            
             this.fireCooldown--;
             if (this.fireCooldown <= 0) {
                 this.fireCooldown = this.fireRate;
@@ -1368,8 +1388,19 @@ class Asteroid {
         }
         
         let dist = Math.sqrt((this.x-player.x)**2 + (this.y-player.y)**2);
-        if(dist < this.size + player.size) {
-            let damage = this.boss ? 35 : (this.elite ? 20 : 8);
+        
+        // Tank boss has shield - check shield collision first
+        if (this.hasShield && this.shieldHealth > 0 && dist < this.shieldRadius + player.size) {
+            let damage = 50; // Tank boss contact damage
+            if (shieldActive) damage = Math.floor(damage / 2);
+            player.health -= damage;
+            playSound('hit');
+            // Bounce player back
+            let pushAngle = Math.atan2(player.y - this.y, player.x - this.x);
+            player.x += Math.cos(pushAngle) * 30;
+            player.y += Math.sin(pushAngle) * 30;
+        } else if(dist < this.size + player.size) {
+            let damage = this.bossType === 'tank' ? 75 : (this.boss ? 35 : (this.elite ? 20 : 8));
             if (shieldActive) damage = Math.floor(damage / 2);
             player.health -= damage;
             playSound('hit');
@@ -1388,6 +1419,24 @@ class Asteroid {
             ctx.shadowColor = '#cc44ff';
             ctx.drawImage(this.image, -this.size, -this.size, this.size * 2, this.size * 2);
             ctx.shadowBlur = 0;
+            
+            // Draw tank boss shield
+            if (this.hasShield && this.shieldHealth > 0) {
+                ctx.beginPath();
+                ctx.arc(0, 0, this.shieldRadius, 0, Math.PI * 2);
+                const shieldAlpha = 0.2 + Math.sin(Date.now() * 0.005) * 0.1;
+                ctx.fillStyle = `rgba(0, 200, 255, ${shieldAlpha})`;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(0, 200, 255, ${0.5 + Math.sin(Date.now() * 0.005) * 0.2})`;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Shield health indicator
+                ctx.fillStyle = '#00c8ff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(Math.ceil(this.shieldHealth), 0, -this.shieldRadius - 10);
+            }
         } else if (this.elite) {
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#FF0000';
@@ -1851,7 +1900,19 @@ function gameLoop() {
         for(let j = bullets.length - 1; j >= 0; j--) {
             let b = bullets[j];
             let dist = Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
-            if(dist < a.size) {
+            
+            // Tank boss shield collision
+            if (a.bossType === 'tank' && a.hasShield && a.shieldHealth > 0 && dist < a.shieldRadius) {
+                a.shieldHealth -= 5;
+                if (a.shieldHealth <= 0) {
+                    a.hasShield = false;
+                    spawnExplosion(a.x, a.y, '#00c8ff');
+                }
+                bullets.splice(j, 1);
+                spawnExplosion(b.x, b.y, '#00c8ff');
+                playSound('hit');
+                updateUI();
+            } else if(dist < a.size) {
                 a.health--;
                 if (a.boss && currentBoss === a) {
                     updateUI();
@@ -1996,9 +2057,12 @@ function spawnBoss() {
     else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 120; }
     else { x = -120; y = Math.random() * canvas.height; }
     
-    // 1st boss: normal, 2nd boss+: shooter
+    // 1st boss: normal, 2nd boss: shooter, 3rd boss+: tank
     bossCount++;
-    let bossType = bossCount === 1 ? 'normal' : 'shooter';
+    let bossType;
+    if (bossCount === 1) bossType = 'normal';
+    else if (bossCount === 2) bossType = 'shooter';
+    else bossType = 'tank';
     
     const boss = new Asteroid(x, y, false, true, bossType);
     asteroids.push(boss);
