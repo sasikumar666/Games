@@ -303,7 +303,7 @@
     </div>
 
     <button class="menu-button" id="startBtn">Launch Mission</button>
-    <button class="menu-button" id="testTankBtn" style="margin-top:10px;border-color:#ff6600;color:#ff6600;">Test Tank Boss</button>
+    <button class="menu-button" id="testBossBtn" style="margin-top:10px;border-color:#ff00ff;color:#ff00ff;">Test Any Boss</button>
 
     <div id="upgradeStore">
         <div class="store-item">
@@ -1400,6 +1400,15 @@ class Asteroid {
                 this.fireRate = 35;
                 this.bulletCount = 3;
                 this.hasShield = false;
+            } else if (bossType === 'chaser') {
+                this.size = 55;
+                this.maxHealth = 200;
+                this.health = 200;
+                this.speed = 2.5;
+                this.fireCooldown = 0;
+                this.fireRate = 40;
+                this.bulletCount = 1;
+                this.hasShield = false;
             } else {
                 this.size = 70;
                 this.maxHealth = 180;
@@ -2215,12 +2224,13 @@ function spawnBoss() {
     else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 120; }
     else { x = -120; y = Math.random() * canvas.height; }
     
-    // 1st boss: normal, 2nd boss: shooter, 3rd boss+: tank
+    // 1st boss: normal, 2nd: tank, 3rd: shooter, 4th+: chaser
     bossCount++;
     let bossType;
     if (bossCount === 1) bossType = 'normal';
-    else if (bossCount === 2) bossType = 'shooter';
-    else bossType = 'tank';
+    else if (bossCount === 2) bossType = 'tank';
+    else if (bossCount === 3) bossType = 'shooter';
+    else bossType = 'chaser';
     
     const boss = new Asteroid(x, y, false, true, bossType);
     asteroids.push(boss);
@@ -2317,7 +2327,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     gameLoop();
 });
 
-document.getElementById('testTankBtn').addEventListener('click', () => {
+document.getElementById('testBossBtn').addEventListener('click', () => {
     if (gameActive) return;
     
     playSound('select');
@@ -2345,9 +2355,9 @@ document.getElementById('testTankBtn').addEventListener('click', () => {
     healthDropAvailable = false;
     shieldDropAvailable = false;
     
-    // Set wave and boss count for tank boss
+    // Set wave and boss count for chaser boss (4th boss)
     waveNumber = 1;
-    bossCount = 2; // Next boss will be tank (2 + 1 = 3)
+    bossCount = 3; // Next boss will be chaser (bossCount++ makes it 4)
     
     document.getElementById('homeScreen').style.display = 'none';
     document.getElementById('ui').style.display = 'flex';
