@@ -926,6 +926,7 @@ let asteroids = [];
 let bullets = [];
 let missiles = [];
 let bossBullets = [];
+let rockets = [];
 let particles = [];
 let stars = [];
 let wipeoutCount = 0;
@@ -995,6 +996,7 @@ function resetGame() {
     bullets = [];
     missiles = [];
     bossBullets = [];
+    rockets = [];
     particles = [];
     wipeoutCount = 0;
     playerXP = 0;
@@ -1308,6 +1310,65 @@ class BossBullet {
     }
 }
 
+class Rocket {
+    constructor(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.speed = 7;
+        this.life = 200;
+        this.radius = 8;
+    }
+    update() {
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        this.life--;
+        
+        // Rocket trail particles
+        if (Math.random() < 0.3) {
+            particles.push({
+                x: this.x - Math.cos(this.angle) * 10,
+                y: this.y - Math.sin(this.angle) * 10,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                life: 0.5,
+                color: '#ff6600',
+                size: Math.random() * 4 + 2,
+                decay: 0.05
+            });
+        }
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // Rocket body
+        ctx.fillStyle = '#ff3300';
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(-8, -6);
+        ctx.lineTo(-8, 6);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Rocket flame
+        ctx.fillStyle = '#ffff00';
+        ctx.beginPath();
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(-15, -4);
+        ctx.lineTo(-15, 4);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff6600';
+        
+        ctx.restore();
+    }
+}
+
 class Asteroid {
     constructor(x, y, elite = false, boss = false, bossType = 'normal') {
         this.x = x; this.y = y;
@@ -1327,6 +1388,8 @@ class Asteroid {
                 this.shieldHealth = 250;
                 this.shieldMaxHealth = 250;
                 this.shieldRadius = 110;
+                this.teleportCooldown = 0;
+                this.teleportInterval = 180; // teleport every 3 seconds
             } else if (bossType === 'shooter') {
                 this.size = 70;
                 this.maxHealth = 150;
@@ -1370,17 +1433,52 @@ class Asteroid {
         if (this.boss) {
             // Tank boss shield regeneration
             if (this.bossType === 'tank' && this.hasShield && this.shieldHealth < this.shieldMaxHealth) {
-                this.shieldHealth += 0.05; // Slowly regenerate shield
+                this.shieldHealth += 0.05;
+            }
+            
+            // Tank boss teleport
+            if (this.bossType === 'tank') {
+                this.teleportCooldown--;
+                if (this.teleportCooldown <= 0) {
+                    this.teleportCooldown = this.teleportInterval + Math.random() * 60;
+                    
+                    // Teleport to a random position away from player
+                    let teleportAngle = Math.random() * Math.PI * 2;
+                    let minDist = 300;
+                    let teleportDist = minDist + Math.random() * 200;
+                    
+                    this.x = player.x + Math.cos(teleportAngle) * teleportDist;
+                    this.y = player.y + Math.sin(teleportAngle) * teleportDist;
+                    
+                    // Keep within canvas bounds
+                    this.x = Math.max(100, Math.min(canvas.width - 100, this.x));
+                    this.y = Math.max(100, Math.min(canvas.height - 100, this.y));
+                    
+                    // Teleport effect
+                    for (let i = 0; i < 20; i++) {
+                        particles.push({
+                            x: this.x + (Math.random() - 0.5) * 50,
+                            y: this.y + (Math.random() - 0.5) * 50,
+                            vx: (Math.random() - 0.5) * 3,
+                            vy: (Math.random() - 0.5) * 3,
+                            life: 0.8,
+                            color: '#00ffff',
+                            size: Math.random() * 5 + 2,
+                            decay: 0.04
+                        });
+                    }
+                }
             }
             
             this.fireCooldown--;
             if (this.fireCooldown <= 0) {
                 this.fireCooldown = this.fireRate;
                 if (this.bossType === 'shooter') {
-                    // Shooter boss fires 3 bullets in spread
                     bossBullets.push(new BossBullet(this.x, this.y, ang));
                     bossBullets.push(new BossBullet(this.x, this.y, ang + 0.3));
                     bossBullets.push(new BossBullet(this.x, this.y, ang - 0.3));
+                } else if (this.bossType === 'tank') {
+                    rockets.push(new Rocket(this.x, this.y, ang));
                 } else {
                     bossBullets.push(new BossBullet(this.x, this.y, ang));
                 }
@@ -1955,6 +2053,27 @@ function gameLoop() {
         }
         if (b.life <= 0 || b.x < -50 || b.x > canvas.width + 50 || b.y < -50 || b.y > canvas.height + 50) {
             bossBullets.splice(i, 1);
+        }
+    }
+
+    // Update rockets (tank boss)
+    for(let i = rockets.length - 1; i >= 0; i--) {
+        let r = rockets[i];
+        r.update();
+        r.draw();
+        const dist = Math.sqrt((r.x - player.x)**2 + (r.y - player.y)**2);
+        if (dist < player.size + r.radius) {
+            let damage = 50;
+            if (shieldActive) damage = Math.floor(damage / 2);
+            player.health -= damage;
+            playSound('hit');
+            spawnExplosion(r.x, r.y, '#ff6600');
+            rockets.splice(i, 1);
+            updateUI();
+            continue;
+        }
+        if (r.life <= 0 || r.x < -50 || r.x > canvas.width + 50 || r.y < -50 || r.y > canvas.height + 50) {
+            rockets.splice(i, 1);
         }
     }
 
