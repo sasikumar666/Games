@@ -249,6 +249,7 @@
     <button class="sound-btn" id="pauseBtn" title="Pause Game">⏸</button>
     <button class="sound-btn" id="muteBtn" title="Toggle Mute">🔊</button>
     <button class="sound-btn" id="musicBtn" title="Toggle Music">🎵</button>
+    <button class="sound-btn" id="voiceBtn" title="Toggle Voice Control">🎤</button>
 </div>
 
 <div id="xpContainer"><div id="xpBar"></div></div>
@@ -266,6 +267,7 @@
     <div class="stat-row">Wipeouts: <span id="wipeoutCount" style="color:#00ffea;">0</span> <small style="font-size:10px; margin-left:10px;">[SPACE]</small></div>
     <div class="stat-row">Missiles: <span id="missileCount" style="color:#ff6600;">0</span> <small style="font-size:10px; margin-left:10px;">[E]</small></div>
     <div class="stat-row">Next Wipeout: <span id="wipeoutTimer" style="color:#ff00ff;">60</span>s</div>
+    <div class="stat-row">Voice: <span id="voiceStatus" style="color:#ff4444;">OFF</span> <small style="font-size:10px; margin-left:10px;">"health", "shield", "wipeout", "missile"</small></div>
     <div id="healthDropIndicator" class="stat-row" style="display:none;">Health Drop Available! <span style="color:#00ff00;">[H]</span></div>
     <div id="shieldDropIndicator" class="stat-row" style="display:none;">Shield Drop Available! <span style="color:#00ffff;">[J]</span></div>
     <div id="shieldTimer" class="stat-row" style="display:none;">Shield: <span id="shieldTimeLeft" style="color:#00ffff;">25</span>s</div>
@@ -347,6 +349,125 @@ let backgroundMusic;
 let isBossMusicActive = false;
 let normalOscillators = [];
 let bossOscillators = [];
+
+// Voice Control
+let speechRecognition;
+let speechSynthesis;
+let isVoiceEnabled = false;
+let voiceCommands = [];
+
+function initVoiceControl() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.warn("Speech recognition not supported");
+        return;
+    }
+    
+    speechRecognition = new SpeechRecognition();
+    speechRecognition.continuous = true;
+    speechRecognition.interimResults = false;
+    speechRecognition.lang = 'en-US';
+    
+    speechRecognition.onstart = () => {
+        isVoiceEnabled = true;
+        console.log("Voice control enabled");
+        updateVoiceStatus(true);
+    };
+    
+    speechRecognition.onerror = (event) => {
+        console.warn("Voice error:", event.error);
+        isVoiceEnabled = false;
+        updateVoiceStatus(false);
+    };
+    
+    speechRecognition.onend = () => {
+        isVoiceEnabled = false;
+        updateVoiceStatus(false);
+        // Auto-restart if game is active
+        if (gameActive) {
+            try { speechRecognition.start(); } catch(e) {}
+        }
+    };
+    
+    speechRecognition.onresult = (event) => {
+        for (let i = 0; i < event.results.length; i++) {
+            const command = event.results[i][0].transcript.toLowerCase().trim();
+            console.log("Voice command:", command);
+            processVoiceCommand(command);
+        }
+    };
+    
+    // Request microphone permission and start
+    try {
+        speechRecognition.start();
+    } catch(e) {
+        console.warn("Could not start speech recognition:", e);
+    }
+    
+    speechSynthesis = window.speechSynthesis;
+}
+
+function processVoiceCommand(command) {
+    if (!gameActive) return;
+    
+    if (command.includes('health') || command.includes('heal')) {
+        if (healthDropAvailable) {
+            spawnHealthDrop();
+            speak("Health drop deployed");
+        } else {
+            speak("No health drop available");
+        }
+    } else if (command.includes('shield') || command.includes('defend')) {
+        if (shieldDropAvailable) {
+            spawnShieldDrop();
+            speak("Shield drop deployed");
+        } else {
+            speak("No shield drop available");
+        }
+    } else if (command.includes('wipeout') || command.includes('nuke') || command.includes('clear')) {
+        if (wipeoutCount > 0) {
+            triggerWipeout();
+            speak("Wipeout activated");
+        } else {
+            speak("No wipeout available");
+        }
+    } else if (command.includes('missile') || command.includes('rocket')) {
+        if (missileCount > 0) {
+            missiles.push(new Missile(player.x, player.y, player.angle));
+            missileCount--;
+            playSound('laser');
+            updateUI();
+            speak("Missile launched");
+        } else {
+            speak("No missile available");
+        }
+    } else if (command.includes('pause') || command.includes('stop')) {
+        togglePause();
+        speak(isPaused ? "Game paused" : "Game resumed");
+    }
+}
+
+function speak(text) {
+    if (!speechSynthesis) return;
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.2;
+    utterance.volume = 0.8;
+    speechSynthesis.speak(utterance);
+}
+
+function updateVoiceStatus(enabled) {
+    const statusEl = document.getElementById('voiceStatus');
+    const btnEl = document.getElementById('voiceBtn');
+    if (statusEl) {
+        statusEl.innerText = enabled ? 'ON' : 'OFF';
+        statusEl.style.color = enabled ? '#00ff00' : '#ff4444';
+    }
+    if (btnEl) {
+        btnEl.style.color = enabled ? '#00ff00' : '#ff4444';
+    }
+}
 
 // Asteroid Images
 const asteroidImages = [];
@@ -2621,6 +2742,33 @@ window.addEventListener('resize', () => {
     canvas.height = window.innerHeight;
     
 
+});
+
+// Initialize voice control on page load
+window.addEventListener('load', () => {
+    // Try to init voice but don't force it
+    setTimeout(() => {
+        try {
+            initVoiceControl();
+        } catch(e) {
+            console.warn("Voice init failed:", e);
+        }
+    }, 1000);
+});
+
+// Voice toggle button
+document.getElementById('voiceBtn').addEventListener('click', () => {
+    if (isVoiceEnabled) {
+        speechRecognition.stop();
+        speak("Voice control disabled");
+    } else {
+        try {
+            speechRecognition.start();
+            speak("Voice control enabled");
+        } catch(e) {
+            speak("Could not enable voice control");
+        }
+    }
 });
 
 // Initialize
