@@ -267,7 +267,7 @@
     <div class="stat-row">Wipeouts: <span id="wipeoutCount" style="color:#00ffea;">0</span> <small style="font-size:10px; margin-left:10px;">[SPACE]</small></div>
     <div class="stat-row">Missiles: <span id="missileCount" style="color:#ff6600;">0</span> <small style="font-size:10px; margin-left:10px;">[E]</small></div>
     <div class="stat-row">Next Wipeout: <span id="wipeoutTimer" style="color:#ff00ff;">60</span>s</div>
-    <div class="stat-row">Voice: <span id="voiceStatus" style="color:#ff4444;">OFF</span> <small style="font-size:10px; margin-left:10px;">"health", "shield", "wipeout", "missile"</small></div>
+    <div class="stat-row">Voice: <span id="voiceStatus" style="color:#ff4444;">OFF</span> <small style="font-size:10px; margin-left:10px;">say: health, shield, wipeout, missile</small></div>
     <div id="healthDropIndicator" class="stat-row" style="display:none;">Health Drop Available! <span style="color:#00ff00;">[H]</span></div>
     <div id="shieldDropIndicator" class="stat-row" style="display:none;">Shield Drop Available! <span style="color:#00ffff;">[J]</span></div>
     <div id="shieldTimer" class="stat-row" style="display:none;">Shield: <span id="shieldTimeLeft" style="color:#00ffff;">25</span>s</div>
@@ -355,6 +355,8 @@ let speechRecognition;
 let speechSynthesis;
 let isVoiceEnabled = false;
 let voiceCommands = [];
+let voiceRestartAttempts = 0;
+const MAX_VOICE_RESTARTS = 5;
 
 function initVoiceControl() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -366,44 +368,55 @@ function initVoiceControl() {
     
     speechRecognition = new SpeechRecognition();
     speechRecognition.continuous = true;
-    speechRecognition.interimResults = false;
+    speechRecognition.interimResults = true;
     speechRecognition.lang = 'en-US';
+    speechRecognition.maxAlternatives = 3;
     
     speechRecognition.onstart = () => {
         isVoiceEnabled = true;
+        voiceRestartAttempts = 0;
         console.log("Voice control enabled");
         updateVoiceStatus(true);
     };
     
     speechRecognition.onerror = (event) => {
         console.warn("Voice error:", event.error);
-        isVoiceEnabled = false;
-        updateVoiceStatus(false);
+        // Don't disable on common errors, just log
+        if (event.error === 'not-allowed') {
+            isVoiceEnabled = false;
+            updateVoiceStatus(false);
+        }
     };
     
     speechRecognition.onend = () => {
-        isVoiceEnabled = false;
-        updateVoiceStatus(false);
-        // Auto-restart if game is active
-        if (gameActive) {
-            try { speechRecognition.start(); } catch(e) {}
+        // Only auto-restart a few times to avoid infinite loops
+        if (voiceRestartAttempts < MAX_VOICE_RESTARTS && gameActive) {
+            voiceRestartAttempts++;
+            try { 
+                setTimeout(() => {
+                    if (gameActive) speechRecognition.start();
+                }, 500);
+            } catch(e) {}
+        } else {
+            isVoiceEnabled = false;
+            updateVoiceStatus(false);
         }
     };
     
     speechRecognition.onresult = (event) => {
-        for (let i = 0; i < event.results.length; i++) {
-            const command = event.results[i][0].transcript.toLowerCase().trim();
-            console.log("Voice command:", command);
-            processVoiceCommand(command);
-        }
+        const results = event.results;
+        if (!results || results.length === 0) return;
+        
+        // Get the final result
+        const lastResult = results[results.length - 1];
+        if (!lastResult.isFinal) return;
+        
+        const command = lastResult[0].transcript.toLowerCase().trim();
+        console.log("Voice command:", command);
+        
+        // Don't process if game is paused from voice
+        processVoiceCommand(command);
     };
-    
-    // Request microphone permission and start
-    try {
-        speechRecognition.start();
-    } catch(e) {
-        console.warn("Could not start speech recognition:", e);
-    }
     
     speechSynthesis = window.speechSynthesis;
 }
@@ -411,28 +424,31 @@ function initVoiceControl() {
 function processVoiceCommand(command) {
     if (!gameActive) return;
     
-    if (command.includes('health') || command.includes('heal')) {
+    // More flexible matching
+    const cmd = command.replace(/\s+/g, '');
+    
+    if (cmd.includes('health') || cmd.includes('heal') || cmd.includes('help')) {
         if (healthDropAvailable) {
             spawnHealthDrop();
             speak("Health drop deployed");
         } else {
             speak("No health drop available");
         }
-    } else if (command.includes('shield') || command.includes('defend')) {
+    } else if (cmd.includes('shield') || cmd.includes('defend')) {
         if (shieldDropAvailable) {
             spawnShieldDrop();
             speak("Shield drop deployed");
         } else {
             speak("No shield drop available");
         }
-    } else if (command.includes('wipeout') || command.includes('nuke') || command.includes('clear')) {
+    } else if (cmd.includes('wipeout') || cmd.includes('nuke') || cmd.includes('clear') || cmd.includes('wave')) {
         if (wipeoutCount > 0) {
             triggerWipeout();
             speak("Wipeout activated");
         } else {
             speak("No wipeout available");
         }
-    } else if (command.includes('missile') || command.includes('rocket')) {
+    } else if (cmd.includes('missile') || cmd.includes('rocket') || cmd.includes('fire')) {
         if (missileCount > 0) {
             missiles.push(new Missile(player.x, player.y, player.angle));
             missileCount--;
@@ -442,10 +458,8 @@ function processVoiceCommand(command) {
         } else {
             speak("No missile available");
         }
-    } else if (command.includes('pause') || command.includes('stop')) {
-        togglePause();
-        speak(isPaused ? "Game paused" : "Game resumed");
     }
+    // Removed pause/stop commands to prevent accidental triggers
 }
 
 function speak(text) {
@@ -2744,27 +2758,33 @@ window.addEventListener('resize', () => {
 
 });
 
-// Initialize voice control on page load
+// Initialize voice control - but don't auto-start listening
 window.addEventListener('load', () => {
-    // Try to init voice but don't force it
-    setTimeout(() => {
-        try {
-            initVoiceControl();
-        } catch(e) {
-            console.warn("Voice init failed:", e);
-        }
-    }, 1000);
+    // Just prepare the voice system, user must click button to enable
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        speechSynthesis = window.speechSynthesis;
+    }
 });
 
 // Voice toggle button
 document.getElementById('voiceBtn').addEventListener('click', () => {
     if (isVoiceEnabled) {
-        speechRecognition.stop();
+        if (speechRecognition) speechRecognition.stop();
+        updateVoiceStatus(false);
         speak("Voice control disabled");
     } else {
+        // Initialize and start
+        if (!speechRecognition) {
+            initVoiceControl();
+        }
         try {
-            speechRecognition.start();
-            speak("Voice control enabled");
+            if (speechRecognition) {
+                speechRecognition.start();
+                speak("Voice control enabled");
+            } else {
+                speak("Voice not supported in this browser");
+            }
         } catch(e) {
             speak("Could not enable voice control");
         }
