@@ -1409,6 +1409,25 @@ class Asteroid {
                 this.fireRate = 40;
                 this.bulletCount = 1;
                 this.hasShield = false;
+            } else if (bossType === 'splitter') {
+                this.size = 80;
+                this.maxHealth = 350;
+                this.health = 350;
+                this.speed = 0.8;
+                this.fireCooldown = 0;
+                this.fireRate = 50;
+                this.bulletCount = 1;
+                this.hasShield = false;
+                this.hasSplit = false;
+            } else if (bossType === 'miniSplitter') {
+                this.size = 45;
+                this.maxHealth = 120;
+                this.health = 120;
+                this.speed = 1.5;
+                this.fireCooldown = 0;
+                this.fireRate = 45;
+                this.bulletCount = 1;
+                this.hasShield = false;
             } else {
                 this.size = 70;
                 this.maxHealth = 180;
@@ -1436,9 +1455,126 @@ class Asteroid {
     }
     update() {
         let ang = Math.atan2(player.y - this.y, player.x - this.x);
-        this.x += Math.cos(ang) * this.speed;
-        this.y += Math.sin(ang) * this.speed;
+        
+        // Mini splitter custom movement - different for each
+        if (this.bossType === 'miniSplitter') {
+            if (this.splitType === 0) {
+                // Circle movement - orbit around player
+                this.orbitAngle += 0.03;
+                const circleRadius = 200 + Math.sin(Date.now() * 0.002) * 50;
+                const targetX = player.x + Math.cos(this.orbitAngle) * circleRadius;
+                const targetY = player.y + Math.sin(this.orbitAngle) * circleRadius;
+                const circleAng = Math.atan2(targetY - this.y, targetX - this.x);
+                this.x += Math.cos(circleAng) * this.speed * 1.2;
+                this.y += Math.sin(circleAng) * this.speed * 1.2;
+                
+                // Particle trail for circle type
+                if (Math.random() < 0.3) {
+                    particles.push({
+                        x: this.x + (Math.random() - 0.5) * 20,
+                        y: this.y + (Math.random() - 0.5) * 20,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        life: 0.5,
+                        color: '#ff66ff',
+                        size: Math.random() * 5 + 2,
+                        decay: 0.04
+                    });
+                }
+            } else {
+                // Strafe movement - move perpendicular to player
+                const strafeDir = Math.random() < 0.5 ? 1 : -1;
+                if (!this.strafeDir) this.strafeDir = strafeDir;
+                
+                // Move toward player but also strafe
+                const strafeAng = ang + (this.strafeDir * Math.PI / 3);
+                this.x += Math.cos(strafeAng) * this.speed;
+                this.y += Math.sin(strafeAng) * this.speed;
+                
+                // Particle trail for strafe type
+                if (Math.random() < 0.3) {
+                    particles.push({
+                        x: this.x + (Math.random() - 0.5) * 20,
+                        y: this.y + (Math.random() - 0.5) * 20,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        life: 0.5,
+                        color: '#66ffff',
+                        size: Math.random() * 5 + 2,
+                        decay: 0.04
+                    });
+                }
+            }
+        } else {
+            // Default movement - toward player
+            this.x += Math.cos(ang) * this.speed;
+            this.y += Math.sin(ang) * this.speed;
+        }
+        
         this.rotation += this.rotationSpeed;
+        
+        // Chaser boss speed trail particles
+        if (this.bossType === 'chaser' && Math.random() < 0.5) {
+            const trailAngle = ang + Math.PI + (Math.random() - 0.5) * 0.5;
+            particles.push({
+                x: this.x - Math.cos(ang) * 30 + (Math.random() - 0.5) * 20,
+                y: this.y - Math.sin(ang) * 30 + (Math.random() - 0.5) * 20,
+                vx: Math.cos(trailAngle) * 2,
+                vy: Math.sin(trailAngle) * 2,
+                life: 0.6,
+                color: Math.random() < 0.5 ? '#ff3300' : '#ff6600',
+                size: Math.random() * 6 + 3,
+                decay: 0.04
+            });
+        }
+        
+        // Splitter boss - split into 2 when HP < 50%
+        if (this.bossType === 'splitter' && !this.hasSplit && this.health < this.maxHealth * 0.5) {
+            this.hasSplit = true;
+            
+            // Create split effect
+            for (let i = 0; i < 30; i++) {
+                const splitAngle = Math.random() * Math.PI * 2;
+                particles.push({
+                    x: this.x + (Math.random() - 0.5) * 40,
+                    y: this.y + (Math.random() - 0.5) * 40,
+                    vx: Math.cos(splitAngle) * 4,
+                    vy: Math.sin(splitAngle) * 4,
+                    life: 1.0,
+                    color: '#ff00ff',
+                    size: Math.random() * 8 + 4,
+                    decay: 0.03
+                });
+            }
+            
+            // Create 2 mini splitters with different behaviors
+            for (let i = 0; i < 2; i++) {
+                const offsetAngle = (i === 0 ? -0.8 : 0.8);
+                const miniSplitter = new Asteroid(
+                    this.x + Math.cos(offsetAngle) * 60,
+                    this.y + Math.sin(offsetAngle) * 60,
+                    false, true, 'miniSplitter'
+                );
+                miniSplitter.size = 45;
+                miniSplitter.maxHealth = 120;
+                miniSplitter.health = 120;
+                miniSplitter.speed = 1.5;
+                miniSplitter.fireRate = 45;
+                miniSplitter.isSplit = true;
+                miniSplitter.splitType = i; // 0 = circle, 1 = strafe
+                miniSplitter.orbitAngle = offsetAngle; // For circular movement
+                asteroids.push(miniSplitter);
+                
+                // First mini splitter becomes the new boss
+                if (i === 0) {
+                    currentBoss = miniSplitter;
+                }
+            }
+            
+            // Mark original for removal (skip death explosion)
+            this.skipDeathExplosion = true;
+            this.health = 0;
+        }
         
         if (this.boss) {
             // Tank boss shield regeneration
@@ -1499,6 +1635,19 @@ class Asteroid {
                     bossBullets.push(new BossBullet(this.x, this.y, ang - 0.3));
                 } else if (this.bossType === 'tank') {
                     rockets.push(new Rocket(this.x, this.y, ang));
+                } else if (this.bossType === 'splitter') {
+                    bossBullets.push(new BossBullet(this.x, this.y, ang));
+                } else if (this.bossType === 'miniSplitter') {
+                    // Different shooting for each mini splitter
+                    if (this.splitType === 0) {
+                        // Circle type - spreads 3 bullets in arc
+                        bossBullets.push(new BossBullet(this.x, this.y, ang));
+                        bossBullets.push(new BossBullet(this.x, this.y, ang + 0.25));
+                        bossBullets.push(new BossBullet(this.x, this.y, ang - 0.25));
+                    } else {
+                        // Strafe type - fast single aimed shot
+                        bossBullets.push(new BossBullet(this.x, this.y, ang));
+                    }
                 } else {
                     bossBullets.push(new BossBullet(this.x, this.y, ang));
                 }
@@ -1518,7 +1667,7 @@ class Asteroid {
             player.x += Math.cos(pushAngle) * 30;
             player.y += Math.sin(pushAngle) * 30;
         } else if(dist < this.size + player.size) {
-            let damage = this.bossType === 'tank' ? 75 : (this.bossType === 'chaser' ? 100 : (this.boss ? 35 : (this.elite ? 20 : 8)));
+            let damage = this.bossType === 'tank' ? 75 : (this.bossType === 'chaser' ? 100 : (this.bossType === 'splitter' || this.bossType === 'miniSplitter' ? 45 : (this.boss ? 35 : (this.elite ? 20 : 8))));
             if (shieldActive) damage = Math.floor(damage / 2);
             player.health -= damage;
             playSound('hit');
@@ -1533,8 +1682,78 @@ class Asteroid {
         ctx.drawImage(this.image, -this.size, -this.size, this.size * 2, this.size * 2);
         
         if (this.boss) {
-            ctx.shadowBlur = 25;
-            ctx.shadowColor = '#cc44ff';
+            // Chaser boss - red aggressive glow
+            if (this.bossType === 'chaser') {
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#ff0000';
+                
+                // Pulsing red outline
+                const pulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size + 5, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 0, 0, ${pulse})`;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                
+                // Draw angry eyes
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(-15, -10, 8, 0, Math.PI * 2);
+                ctx.arc(15, -10, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eye pupils
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(-13, -10, 4, 0, Math.PI * 2);
+                ctx.arc(17, -10, 4, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (this.bossType === 'splitter' || this.bossType === 'miniSplitter') {
+                // Splitter boss - purple/magenta glow with pulsing rings
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = '#ff00ff';
+                
+                // Pulsing outer ring
+                const pulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size + 8, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 0, 255, ${pulse * 0.6})`;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Inner ring
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size + 3, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 100, 255, ${pulse * 0.4})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Draw core indicator - different colors for each type
+                if (this.bossType === 'miniSplitter') {
+                    if (this.splitType === 0) {
+                        // Circle type - pink/magenta
+                        ctx.fillStyle = '#ff66ff';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // Strafe type - cyan
+                        ctx.fillStyle = '#66ffff';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = '#cc44ff';
+            }
+            
             ctx.drawImage(this.image, -this.size, -this.size, this.size * 2, this.size * 2);
             ctx.shadowBlur = 0;
             
@@ -2071,7 +2290,7 @@ function gameLoop() {
 
         if(a.health <= 0) {
             const explodeColor = a.boss ? '#cc44ff' : (a.elite ? '#f00' : '#0ff');
-            if (a.boss) {
+            if (a.boss && !a.skipDeathExplosion) {
                 triggerBossDeathExplosion(a.x, a.y);
                 grantHealthDrop();
                 grantShieldDrop();
@@ -2230,7 +2449,8 @@ function spawnBoss() {
     if (bossCount === 1) bossType = 'normal';
     else if (bossCount === 2) bossType = 'tank';
     else if (bossCount === 3) bossType = 'shooter';
-    else bossType = 'chaser';
+    else if (bossCount === 4) bossType = 'chaser';
+    else bossType = 'splitter';
     
     const boss = new Asteroid(x, y, false, true, bossType);
     asteroids.push(boss);
@@ -2355,9 +2575,11 @@ document.getElementById('testBossBtn').addEventListener('click', () => {
     healthDropAvailable = false;
     shieldDropAvailable = false;
     
-    // Set wave and boss count for chaser boss (4th boss)
+    // Set wave and boss count for Splitter (5th boss)
     waveNumber = 1;
-    bossCount = 3; // Next boss will be chaser (bossCount++ makes it 4)
+    bossCount = 4; // spawnBoss() will increment to 5 = splitter
+    
+    console.log('Testing boss: Splitter (5th)');
     
     document.getElementById('homeScreen').style.display = 'none';
     document.getElementById('ui').style.display = 'flex';
@@ -2376,7 +2598,7 @@ document.getElementById('testBossBtn').addEventListener('click', () => {
     
     updateUI();
     
-    // Spawn tank boss immediately
+    // Spawn Splitter boss immediately
     spawnBoss();
     gameLoop();
 });
